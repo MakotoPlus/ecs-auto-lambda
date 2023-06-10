@@ -8,7 +8,7 @@ Lambda
 ServleressFramework 3系  
 
 
-* ECSタスクの起動・停止の追加方法
+* ECSタスクの起動・停止の追加方法  
   serverless.ymlに追記
 
 
