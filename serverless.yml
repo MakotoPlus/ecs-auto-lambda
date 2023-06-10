@@ -1,0 +1,108 @@
+service: poc
+frameworkVersion: '3'
+provider:
+  name: aws
+  runtime: python3.9
+  lambdaHashingVersion: 20201221
+  region: ${opt:region, self:custom.defaultRegion}
+  stackName: ${self:service}
+  eventBridge:
+    useCloudFormation: true
+  stage: ${opt:stage, self:custom.defaultStage}
+
+custom:
+ defaultStage: dev
+ defaultRegion: ap-northeast-1
+
+package:
+ patterns:
+    - <不要なファイルを記載>
+plugins:
+  - serverless-python-requirements
+functions:
+  ECSTaskControllerFunction:
+    handler: src.task_control.handler
+    name: ${self:service}-${self:provider.stage}-ecs-task-controller
+    description: ECSタスク起動停止用
+    memorySize: 256
+    timeout: 30
+    role: ECSTaskControllerLambdaRole
+    layers:
+      - arn:aws:lambda:${self:provider.region}:017000801446:layer:AWSLambdaPowertoolsPython:4
+      #- arn:aws:lambda:${self:provider.region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:34
+    #environment:
+       #ECS_CLUSTER_NAME: 
+       #- django_sql_service_connect, django_sql_service_connect
+       #ECS_SERVICE_NAME:
+       #- nginx_conservice, django
+    events:
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-stop-nginx_conservice
+          description: NGINXタスク停止用
+          rate: cron(0 11 * * ? *)
+          input:
+            process: stop
+            cluster: django_sql_service_connect
+            service: nginx_conservice
+            desiredCount: 0
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-stop-django
+          description: DJANGOタスク停止用
+          rate: cron(0 11 * * ? *)
+          input:
+            process: stop
+            cluster: django_sql_service_connect
+            service: django
+            desiredCount: 0
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-start-nginx_conservice
+          description: ECSタスク起動用
+          rate: cron(0 10 * * ? *)
+          input:
+            process: start
+            cluster: django_sql_service_connect
+            service: nginx_conservice
+            desiredCount: 1
+      - schedule:
+          name: ${self:service}-${self:provider.stage}-start-django
+          description: DJANGOタスク起動用
+          rate: cron(0 10 * * ? *)
+          input:
+            process: start
+            cluster: django_sql_service_connect
+            service: django
+            desiredCount: 1
+resources:
+  Resources:
+    # -----
+    # IAM：ECSタスク起動停止用
+    # -----
+    ECSTaskControllerLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-lambda-role
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+          - !Ref ECSTaskControllerPolicy
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+    ECSTaskControllerPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        ManagedPolicyName: ${self:service}-policy
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - ecs:UpdateService
+                - ecs:DescribeServices
+              Resource:
+                - arn:aws:ecs:${aws:region}:${aws:accountId}:service/*
+
