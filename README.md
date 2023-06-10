@@ -1,6 +1,6 @@
 # ecs-auto-lambda
 
-#### ECSのタスクを指定時刻で自動起動、自動停止
+#### ECSのタスクを指定時刻に自動起動、自動停止
 
 * 利用ライブラリ  
 Amazon EventBridge  
